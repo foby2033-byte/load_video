@@ -59,7 +59,9 @@ def download_video(url: str):
 
     ydl_opts = {
         "format": "bestvideo[height<=1080]+bestaudio/best",
+
         "merge_output_format": "mp4",
+
         "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
 
         "quiet": True,
@@ -67,6 +69,14 @@ def download_video(url: str):
 
         "noplaylist": True,
 
+        # Попытки загрузки
+        "retries": 10,
+        "fragment_retries": 10,
+
+        # Таймаут
+        "socket_timeout": 30,
+
+        # Имитация клиента YouTube
         "extractor_args": {
             "youtube": {
                 "player_client": [
@@ -76,20 +86,44 @@ def download_video(url: str):
             }
         },
 
-        "retries": 10,
-        "fragment_retries": 10,
-        "socket_timeout": 30,
+        # Заголовки браузера
+        "http_headers": {
+            "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "Chrome/120 Safari/537.36"
+        },
     }
 
 
+    # Если есть cookies.txt - использовать
+    cookies = os.path.join(
+        os.getcwd(),
+        "cookies.txt"
+    )
+
+    if os.path.exists(cookies):
+        ydl_opts["cookiefile"] = cookies
+
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
         info = ydl.extract_info(
             url,
             download=True
         )
 
+
         filename = ydl.prepare_filename(info)
+
         filename = os.path.splitext(filename)[0] + ".mp4"
+
+
+        if not os.path.exists(filename):
+            raise Exception(
+                "Видео скачалось, но файл не найден"
+            )
+
 
         return filename
 
