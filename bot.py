@@ -58,44 +58,34 @@ async def health(request):
 def download_video(url: str):
 
     ydl_opts = {
-        "format": "bestvideo[height<=1080]+bestaudio/best",
 
-        "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
+        "format": "bestvideo+bestaudio/best",
 
         "merge_output_format": "mp4",
 
+        "outtmpl":
+        f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
+
+        "quiet": True,
+
         "noplaylist": True,
 
-        "quiet": False,
+        "retries": 10,
 
-        "retries": 5,
-        "fragment_retries": 5,
+        "fragment_retries": 10,
 
         "socket_timeout": 60,
-
-        # новый способ обхода блокировок клиента
-        "extractor_args": {
-            "youtube": {
-                "player_client": [
-                    "web_creator",
-                    "android"
-                ]
-            }
-        },
-
-        # имитация Chrome
-        "http_headers": {
-            "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 "
-            "Chrome/124.0.0.0 Safari/537.36"
-        },
-
-        # использовать curl вместо обычного запроса
-        "http_chunk_size": 10485760,
-
-        "nocheckcertificate": True,
     }
+
+
+    cookies = os.path.join(
+        os.getcwd(),
+        "cookies.txt"
+    )
+
+
+    if os.path.exists(cookies):
+        ydl_opts["cookiefile"] = cookies
 
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -105,13 +95,11 @@ def download_video(url: str):
             download=True
         )
 
+        filename = ydl.prepare_filename(info)
 
-        file = ydl.prepare_filename(info)
+        filename = os.path.splitext(filename)[0] + ".mp4"
 
-        file = os.path.splitext(file)[0] + ".mp4"
-
-
-        return file
+        return filename
 
 # ==============================
 # START COMMAND
