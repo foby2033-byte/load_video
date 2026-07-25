@@ -43,7 +43,7 @@ logging.basicConfig(
 # =========================
 
 bot = Bot(
-    token=BOT_TOKEN
+    token=bot = Bot(token="8973916830:AAHBRwq2X2XrIyJmQagYBFOZdrziW5rOlKo")
 )
 
 dp = Dispatcher()
