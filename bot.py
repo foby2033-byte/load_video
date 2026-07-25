@@ -55,33 +55,43 @@ async def health(request):
 # ==============================
 # DOWNLOAD VIDEO
 # ==============================
-def download_video(url: str) -> str:
+def download_video(url: str):
+
     ydl_opts = {
-        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-        'outtmpl': f'{DOWNLOAD_DIR}/%(id)s.%(ext)s',
-        'merge_output_format': 'mp4',
-        'quiet': True,
-        'no_warnings': True,
-        # Защита от блокировок YouTube (Имитация клиента Android)
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android'],
-                'skip': ['webpage']
+        "format": "bestvideo[height<=1080]+bestaudio/best",
+        "merge_output_format": "mp4",
+        "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
+
+        "quiet": True,
+        "no_warnings": True,
+
+        "noplaylist": True,
+
+        "extractor_args": {
+            "youtube": {
+                "player_client": [
+                    "android",
+                    "web"
+                ]
             }
         },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Android 14; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-        }
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-        if not os.path.exists(filename):
-            filename = os.path.splitext(filename) + '.mp4'
-        return filename
 
+        "retries": 10,
+        "fragment_retries": 10,
+        "socket_timeout": 30,
+    }
+
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(
+            url,
+            download=True
+        )
+
+        filename = ydl.prepare_filename(info)
+        filename = os.path.splitext(filename)[0] + ".mp4"
+
+        return filename
 
 
 # ==============================
