@@ -57,6 +57,12 @@ async def health(request):
 # ==============================
 def download_video(url: str):
 
+    "extractor_args": {
+    "instagram": {
+        "api_hostname": "www.instagram.com"
+    }
+}
+
     ydl_opts = {
 
         "format": "bestvideo+bestaudio/best",
