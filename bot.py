@@ -57,20 +57,13 @@ async def health(request):
 # ==============================
 def download_video(url: str):
 
-    "extractor_args": {
-    "instagram": {
-        "api_hostname": "www.instagram.com"
-    }
-}
-
     ydl_opts = {
 
         "format": "bestvideo+bestaudio/best",
 
         "merge_output_format": "mp4",
 
-        "outtmpl":
-        f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
+        "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
 
         "quiet": True,
 
@@ -81,6 +74,29 @@ def download_video(url: str):
         "fragment_retries": 10,
 
         "socket_timeout": 60,
+
+
+        # Instagram / YouTube настройки
+        "extractor_args": {
+            "instagram": {
+                "api_hostname": "www.instagram.com"
+            },
+            "youtube": {
+                "player_client": [
+                    "android",
+                    "web"
+                ]
+            }
+        },
+
+
+        # Браузерный User-Agent
+        "http_headers": {
+            "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "Chrome/124 Safari/537.36"
+        }
     }
 
 
@@ -101,12 +117,19 @@ def download_video(url: str):
             download=True
         )
 
+
         filename = ydl.prepare_filename(info)
 
         filename = os.path.splitext(filename)[0] + ".mp4"
 
-        return filename
 
+        if not os.path.exists(filename):
+            raise Exception(
+                "Файл не найден после скачивания"
+            )
+
+
+        return filename
 # ==============================
 # START COMMAND
 # ==============================
