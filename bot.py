@@ -60,50 +60,42 @@ def download_video(url: str):
     ydl_opts = {
         "format": "bestvideo[height<=1080]+bestaudio/best",
 
-        "merge_output_format": "mp4",
-
         "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
 
-        "quiet": True,
-        "no_warnings": True,
+        "merge_output_format": "mp4",
 
         "noplaylist": True,
 
-        # Попытки загрузки
-        "retries": 10,
-        "fragment_retries": 10,
+        "quiet": False,
 
-        # Таймаут
-        "socket_timeout": 30,
+        "retries": 5,
+        "fragment_retries": 5,
 
-        # Имитация клиента YouTube
+        "socket_timeout": 60,
+
+        # новый способ обхода блокировок клиента
         "extractor_args": {
             "youtube": {
                 "player_client": [
-                    "android",
-                    "web"
+                    "web_creator",
+                    "android"
                 ]
             }
         },
 
-        # Заголовки браузера
+        # имитация Chrome
         "http_headers": {
             "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 "
-            "Chrome/120 Safari/537.36"
+            "Chrome/124.0.0.0 Safari/537.36"
         },
+
+        # использовать curl вместо обычного запроса
+        "http_chunk_size": 10485760,
+
+        "nocheckcertificate": True,
     }
-
-
-    # Если есть cookies.txt - использовать
-    cookies = os.path.join(
-        os.getcwd(),
-        "cookies.txt"
-    )
-
-    if os.path.exists(cookies):
-        ydl_opts["cookiefile"] = cookies
 
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -114,19 +106,12 @@ def download_video(url: str):
         )
 
 
-        filename = ydl.prepare_filename(info)
+        file = ydl.prepare_filename(info)
 
-        filename = os.path.splitext(filename)[0] + ".mp4"
-
-
-        if not os.path.exists(filename):
-            raise Exception(
-                "Видео скачалось, но файл не найден"
-            )
+        file = os.path.splitext(file)[0] + ".mp4"
 
 
-        return filename
-
+        return file
 
 # ==============================
 # START COMMAND
