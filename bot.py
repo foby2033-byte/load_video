@@ -19,7 +19,7 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=TOKEN)
+bot = Bot(token="8973916830:AAGuCnzVJTibJwMoF_-srCAeh2BZfRG_DGo")
 dp = Dispatcher()
 
 
