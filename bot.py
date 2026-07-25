@@ -1,151 +1,91 @@
 import os
 import asyncio
-import random
-import requests
-
-from dotenv import load_dotenv
-from bs4 import BeautifulSoup
-
+import re
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+import yt_dlp
 
-
-load_dotenv("/home/admin-super/pinterest_bot/.env")
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Жестко прописанная конфигурация без использования сторонних файлов .env
+BOT_TOKEN = "8973916830:AAGuCnzVJTibJwMoF_-srCAeh2BZfRG_DGo"
 OWNER_ID = 63888386
+DOWNLOAD_DIR = "/tmp/downloads"
 
-print("TOKEN CHECK:", BOT_TOKEN[:10] if BOT_TOKEN else "EMPTY")
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# Инициализируем бота напрямую строкой токена
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-def clean_query(text: str) -> str:
-    words = [
-        "пришли", "мне", "фото", "фотку", "фотографию",
-        "картинку", "покажи", "отправь", "найди", "пожалуйста"
-    ]
-    text = text.lower()
-    for w in words:
-        text = text.replace(w, "")
-    return text.strip()
+async def handle(request):
+    return web.Response(text="Bot is running active!")
 
-
-def get_image(query: str):
-    url = "https://www.bing.com/images/search?q=" + requests.utils.quote(query)
-
-    headers = {
-        "User-Agent": "Mozilla/5.0"
+def download_video(url: str) -> str:
+    ydl_opts = {
+        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        'outtmpl': f'{DOWNLOAD_DIR}/%(id)s.%(ext)s',
+        'merge_output_format': 'mp4',
+        'quiet': True,
+        'no_warnings': True
     }
-
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        images = []
-
-        for a in soup.find_all("a"):
-            data = a.get("m")
-            if not data or "murl" not in data:
-                continue
-
-            try:
-                img = data.split('"murl":"')[1].split('"')[0]
-                img = img.replace("\\/", "/")
-                if img.startswith("http"):
-                    images.append(img)
-            except Exception:
-                pass
-
-        if images:
-            return random.choice(images)
-
-    except Exception as e:
-        print(e)
-
-    return None
-
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
+        if not os.path.exists(filename):
+            filename = os.path.splitext(filename) + '.mp4'
+        return filename
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
     if message.from_user.id != OWNER_ID:
         return
-
-    await message.answer(
-        "🤖 Бот работает.\n\n"
-        "Используйте:\n"
-        "@pint коты"
-    )
-
+    await message.answer("🤖 Бот готов. Отправьте ссылку на видео, и я скачаю его в 1080p!")
 
 @dp.message()
-async def search(message: types.Message):
-
+async def handle_message(message: types.Message):
     if message.from_user.id != OWNER_ID:
         return
-
     if not message.text:
         return
 
-    if not message.text.lower().startswith("@pint"):
+    urls = re.findall(r'(https?://[^\s]+)', message.text)
+    if not urls:
+        await message.answer("Пожалуйста, отправьте корректную ссылку на видео.")
         return
 
-    query = clean_query(message.text[5:].strip())
+    url = urls[0]
+    status_msg = await message.answer("⏳ Скачиваю видео в качестве 1080p...")
 
-    if not query:
-        await message.answer("После @pint укажите запрос.")
-        return
+    try:
+        loop = asyncio.get_event_loop()
+        file_path = await loop.run_in_executor(None, download_video, url)
 
-    image = get_image(query)
-
-    pinterest = (
-        "https://www.pinterest.com/search/pins/?q="
-        + requests.utils.quote(query)
-    )
-    if image:
-        try:
-            img_data = requests.get(
-                image,
-                headers={
-                    "User-Agent": "Mozilla/5.0"
-                },
-                timeout=10
-            ).content
-
-            with open("/tmp/photo.jpg", "wb") as f:
-                f.write(img_data)
-
-            await message.answer_photo(
-                photo=types.FSInputFile("/tmp/photo.jpg"),
-                caption=(
-                    f"🔗 Pinterest:\n{pinterest}\n\n"
-                    "Я всегда рад вам помочь 😊😊😊"
-                )
+        if file_path and os.path.exists(file_path):
+            await status_msg.edit_text("🚀 Загружаю видео в Telegram...")
+            await message.answer_video(
+                video=types.FSInputFile(file_path),
+                caption="Держи свое видео в отличном качестве! 😊"
             )
-
-        except Exception as e:
-            print("PHOTO ERROR:", e)
-
-            await message.answer(
-                f"🔗 Pinterest:\n{pinterest}\n\n"
-                "Я всегда рад вам помочь 😊😊😊"
-            )
-
-    else:
-        await message.answer(
-            f"🔗 Pinterest:\n{pinterest}\n\n"
-            "Я всегда рад вам помочь 😊😊😊"
-        )
-        await message.answer(
-            f"🔗 Pinterest:\n{pinterest}\n\n"
-            "Я всегда рад вам помочь 😊😊😊"
-        )
-
+            os.remove(file_path)
+            await status_msg.delete()
+        else:
+            await status_msg.edit_text("❌ Не удалось скачать видео.")
+    except Exception as e:
+        print(f"DOWNLOAD ERROR: {e}")
+        await status_msg.edit_text("❌ Произошла ошибка при обработке видео.")
 
 async def main():
     print("BOT ONLINE")
-    await dp.start_polling(bot)
-
+    app = web.Application()
+    app.router.add_get('/', handle)
+    asyncio.create_task(dp.start_polling(bot))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     asyncio.run(main())
