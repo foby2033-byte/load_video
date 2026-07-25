@@ -4,29 +4,33 @@ import asyncio
 import logging
 
 from aiohttp import web
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile
+from aiogram.exceptions import TelegramBadRequest
 
 import yt_dlp
 
 
-# ==============================
+# =========================
 # CONFIG
-# ==============================
+# =========================
 
-BOT_TOKEN = "8973916830:AAHBRwq2X2XrIyJmQagYBFOZdrziW5rOlKo"
+BOT_TOKEN = "YOUR_BOT_TOKEN"
 OWNER_ID = 63888386
 
-DOWNLOAD_DIR = "/tmp/downloads"
+DOWNLOAD_DIR = "downloads"
 
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(
+    DOWNLOAD_DIR,
+    exist_ok=True
+)
 
 
-# ==============================
+# =========================
 # LOGGING
-# ==============================
+# =========================
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,71 +38,34 @@ logging.basicConfig(
 )
 
 
-# ==============================
-# BOT INIT
-# ==============================
+# =========================
+# BOT
+# =========================
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(
+    token=BOT_TOKEN
+)
+
 dp = Dispatcher()
 
 
-# ==============================
-# WEB SERVER (FOR RENDER)
-# ==============================
 
-async def health(request):
+# =========================
+# WEB SERVER
+# =========================
+
+async def home(request):
     return web.Response(
-        text="Bot is running!"
+        text="Bot is alive"
     )
 
 
-# ==============================
-# DOWNLOAD VIDEO
-# ==============================
-def download_video(url: str):
 
-    ydl_opts = {
+# =========================
+# DOWNLOAD
+# =========================
 
-        "format": "bestvideo+bestaudio/best",
-
-        "merge_output_format": "mp4",
-
-        "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
-
-        "quiet": True,
-
-        "noplaylist": True,
-
-        "retries": 10,
-
-        "fragment_retries": 10,
-
-        "socket_timeout": 60,
-
-
-        # Instagram / YouTube настройки
-        "extractor_args": {
-            "instagram": {
-                "api_hostname": "www.instagram.com"
-            },
-            "youtube": {
-                "player_client": [
-                    "android",
-                    "web"
-                ]
-            }
-        },
-
-
-        # Браузерный User-Agent
-        "http_headers": {
-            "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 "
-            "Chrome/124 Safari/537.36"
-        }
-    }
-
+def download_video(url):
 
     cookies = os.path.join(
         os.getcwd(),
@@ -106,11 +73,101 @@ def download_video(url: str):
     )
 
 
+    ydl_opts = {
+
+        # для Instagram лучше best
+        "format":
+        "bestvideo+bestaudio/best",
+
+
+        "outtmpl":
+        f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
+
+
+        "merge_output_format":
+        "mp4",
+
+
+        "noplaylist":
+        True,
+
+
+        "quiet":
+        False,
+
+
+        "no_warnings":
+        False,
+
+
+        "retries":
+        10,
+
+
+        "fragment_retries":
+        10,
+
+
+        "socket_timeout":
+        60,
+
+
+        "http_headers": {
+
+            "User-Agent":
+            (
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "Chrome/120 Safari/537.36"
+            )
+
+        },
+
+
+        "extractor_args": {
+
+            "youtube": {
+
+                "player_client":
+                [
+                    "android",
+                    "web"
+                ]
+
+            },
+
+            "instagram": {
+
+                "api_hostname":
+                "www.instagram.com"
+
+            }
+
+        }
+
+    }
+
+
+
+    # cookies для Instagram / YouTube
     if os.path.exists(cookies):
+
+        logging.info(
+            "cookies.txt найден"
+        )
+
         ydl_opts["cookiefile"] = cookies
+
+    else:
+
+        logging.warning(
+            "cookies.txt отсутствует"
+        )
+
 
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
 
         info = ydl.extract_info(
             url,
@@ -118,42 +175,59 @@ def download_video(url: str):
         )
 
 
-        filename = ydl.prepare_filename(info)
+        filename = ydl.prepare_filename(
+            info
+        )
 
-        filename = os.path.splitext(filename)[0] + ".mp4"
+
+        filename = (
+            os.path.splitext(filename)[0]
+            +
+            ".mp4"
+        )
 
 
         if not os.path.exists(filename):
+
             raise Exception(
-                "Файл не найден после скачивания"
+                "Файл не создан"
             )
 
 
         return filename
-# ==============================
-# START COMMAND
-# ==============================
 
-@dp.message(Command("start"))
-async def start(message: types.Message):
+
+
+# =========================
+# START
+# =========================
+
+@dp.message(
+    Command("start")
+)
+async def start(
+    message: types.Message
+):
 
     if message.from_user.id != OWNER_ID:
         return
 
 
     await message.answer(
-        "🤖 Бот запущен!\n\n"
-        "Отправь ссылку на видео."
+        "🤖 Бот работает\n\n"
+        "Отправь ссылку на видео"
     )
 
 
 
-# ==============================
-# MESSAGE HANDLER
-# ==============================
+# =========================
+# MESSAGE
+# =========================
 
 @dp.message()
-async def message_handler(message: types.Message):
+async def handler(
+    message: types.Message
+):
 
     if message.from_user.id != OWNER_ID:
         return
@@ -163,27 +237,30 @@ async def message_handler(message: types.Message):
         return
 
 
-    urls = re.findall(
+    links = re.findall(
         r"https?://\S+",
         message.text
     )
 
 
-    if not urls:
+    if not links:
 
         await message.answer(
-            "❌ Отправь ссылку на видео"
+            "❌ Нет ссылки"
         )
 
         return
 
 
 
-    url = urls[0]
+    url = links[0]
+
+    # убрать параметры ?igsh=
+    url = url.split("?")[0]
 
 
     status = await message.answer(
-        "⏳ Скачиваю видео..."
+        "⏳ Скачиваю..."
     )
 
 
@@ -191,6 +268,7 @@ async def message_handler(message: types.Message):
 
 
     try:
+
 
         loop = asyncio.get_running_loop()
 
@@ -202,27 +280,41 @@ async def message_handler(message: types.Message):
         )
 
 
-        await status.edit_text(
-            "📤 Отправляю видео..."
+        size = os.path.getsize(
+            file_path
         )
-size = os.path.getsize(file_path)
 
-if size > 50 * 1024 * 1024:
-    await message.answer(
-        "❌ Видео слишком большое для отправки."
-    )
-    return
+
+        # ограничение Telegram
+        if size > 50 * 1024 * 1024:
+
+            await status.edit_text(
+                "❌ Файл больше 50 МБ"
+            )
+
+            return
+
+
+
+        await status.edit_text(
+            "📤 Отправляю..."
+        )
+
 
         await message.answer_video(
-            video=FSInputFile(file_path),
-            caption="✅ Готово!"
+            video=FSInputFile(
+                file_path
+            ),
+            caption="✅ Готово"
         )
 
 
         try:
+
             await status.delete()
 
         except TelegramBadRequest:
+
             pass
 
 
@@ -235,7 +327,8 @@ if size > 50 * 1024 * 1024:
 
         await status.edit_text(
             "❌ Ошибка:\n"
-            f"{str(e)[:300]}"
+            +
+            str(e)[:500]
         )
 
 
@@ -245,35 +338,32 @@ if size > 50 * 1024 * 1024:
 
         if file_path and os.path.exists(file_path):
 
-            try:
-                os.remove(file_path)
-
-            except Exception:
-                pass
+            os.remove(
+                file_path
+            )
 
 
 
-
-# ==============================
+# =========================
 # MAIN
-# ==============================
+# =========================
 
 async def main():
-
-    logging.info(
-        "BOT STARTED"
-    )
 
 
     app = web.Application()
 
+
     app.router.add_get(
         "/",
-        health
+        home
     )
 
 
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(
+        app
+    )
+
 
     await runner.setup()
 
@@ -294,6 +384,11 @@ async def main():
 
 
     await site.start()
+
+
+    logging.info(
+        "BOT STARTED"
+    )
 
 
     await dp.start_polling(
