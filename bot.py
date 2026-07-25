@@ -205,7 +205,13 @@ async def message_handler(message: types.Message):
         await status.edit_text(
             "📤 Отправляю видео..."
         )
+size = os.path.getsize(file_path)
 
+if size > 50 * 1024 * 1024:
+    await message.answer(
+        "❌ Видео слишком большое для отправки."
+    )
+    return
 
         await message.answer_video(
             video=FSInputFile(file_path),
