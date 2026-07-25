@@ -1,405 +1,113 @@
-import os
-import re
 import asyncio
 import logging
+import os
 
-from aiohttp import web
-
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import FSInputFile
-from aiogram.exceptions import TelegramBadRequest
+from aiogram import Bot, Dispatcher
+from aiogram.filters import CommandStart
+from aiogram.types import Message, FSInputFile
 
 import yt_dlp
 
 
+# ВСТАВЬТЕ НОВЫЙ ТОКЕН ОТ @BotFather
+TOKEN = "ВАШ_ТОКЕН"
 
-# =========================
-# CONFIG
-# =========================
-
-BOT_TOKEN = "YOUR_BOT_TOKEN"
-OWNER_ID = 63888386
 
 DOWNLOAD_DIR = "downloads"
 
-os.makedirs(
-    DOWNLOAD_DIR,
-    exist_ok=True
-)
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+logging.basicConfig(level=logging.INFO)
 
-# =========================
-# LOGGING
-# =========================
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
-
-
-# =========================
-# BOT
-# =========================
-
-bot = Bot(
-    token=bot = Bot(token="8973916830:AAHBRwq2X2XrIyJmQagYBFOZdrziW5rOlKo")
-)
-
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
-
-# =========================
-# WEB SERVER
-# =========================
-
-async def home(request):
-    return web.Response(
-        text="Bot is alive"
+@dp.message(CommandStart())
+async def start(message: Message):
+    await message.answer(
+        "✅ Бот работает!\n\n"
+        "Отправьте ссылку YouTube или Instagram."
     )
 
 
+@dp.message()
+async def download_video(message: Message):
 
-# =========================
-# DOWNLOAD
-# =========================
+    url = message.text
 
-def download_video(url):
-
-    cookies = os.path.join(
-        os.getcwd(),
-        "cookies.txt"
-    )
-
-
-    ydl_opts = {
-
-        # для Instagram лучше best
-        "format":
-        "bestvideo+bestaudio/best",
-
-
-        "outtmpl":
-        f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
-
-
-        "merge_output_format":
-        "mp4",
-
-
-        "noplaylist":
-        True,
-
-
-        "quiet":
-        False,
-
-
-        "no_warnings":
-        False,
-
-
-        "retries":
-        10,
-
-
-        "fragment_retries":
-        10,
-
-
-        "socket_timeout":
-        60,
-
-
-        "http_headers": {
-
-            "User-Agent":
-            (
-                "Mozilla/5.0 "
-                "(Windows NT 10.0; Win64; x64) "
-                "Chrome/120 Safari/537.36"
-            )
-
-        },
-
-
-        "extractor_args": {
-
-            "youtube": {
-
-                "player_client":
-                [
-                    "android",
-                    "web"
-                ]
-
-            },
-
-            "instagram": {
-
-                "api_hostname":
-                "www.instagram.com"
-
-            }
-
-        }
-
-    }
-
-
-
-    # cookies для Instagram / YouTube
-    if os.path.exists(cookies):
-
-        logging.info(
-            "cookies.txt найден"
+    if not url or not url.startswith("http"):
+        await message.answer(
+            "❌ Отправьте ссылку на видео"
         )
-
-        ydl_opts["cookiefile"] = cookies
-
-    else:
-
-        logging.warning(
-            "cookies.txt отсутствует"
-        )
-
-
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-
-        info = ydl.extract_info(
-            url,
-            download=True
-        )
-
-
-        filename = ydl.prepare_filename(
-            info
-        )
-
-
-        filename = (
-            os.path.splitext(filename)[0]
-            +
-            ".mp4"
-        )
-
-
-        if not os.path.exists(filename):
-
-            raise Exception(
-                "Файл не создан"
-            )
-
-
-        return filename
-
-
-
-# =========================
-# START
-# =========================
-
-@dp.message(
-    Command("start")
-)
-async def start(
-    message: types.Message
-):
-
-    if message.from_user.id != OWNER_ID:
         return
 
 
     await message.answer(
-        "🤖 Бот работает\n\n"
-        "Отправь ссылку на видео"
+        "⏳ Скачиваю видео..."
     )
-
-
-
-# =========================
-# MESSAGE
-# =========================
-
-@dp.message()
-async def handler(
-    message: types.Message
-):
-
-    if message.from_user.id != OWNER_ID:
-        return
-
-
-    if not message.text:
-        return
-
-
-    links = re.findall(
-        r"https?://\S+",
-        message.text
-    )
-
-
-    if not links:
-
-        await message.answer(
-            "❌ Нет ссылки"
-        )
-
-        return
-
-
-
-    url = links[0]
-
-    # убрать параметры ?igsh=
-    url = url.split("?")[0]
-
-
-    status = await message.answer(
-        "⏳ Скачиваю..."
-    )
-
-
-    file_path = None
 
 
     try:
 
+        options = {
+            "format": "best",
+            "outtmpl": f"{DOWNLOAD_DIR}/%(title)s.%(ext)s",
+            "noplaylist": True,
 
-        loop = asyncio.get_running_loop()
-
-
-        file_path = await loop.run_in_executor(
-            None,
-            download_video,
-            url
-        )
-
-
-        size = os.path.getsize(
-            file_path
-        )
+            # Для Instagram нужен cookies.txt
+            "cookiefile": "cookies.txt",
+        }
 
 
-        # ограничение Telegram
-        if size > 50 * 1024 * 1024:
+        with yt_dlp.YoutubeDL(options) as ydl:
 
-            await status.edit_text(
-                "❌ Файл больше 50 МБ"
+            info = ydl.extract_info(
+                url,
+                download=True
             )
 
-            return
+            filename = ydl.prepare_filename(info)
 
 
+        if os.path.exists(filename):
 
-        await status.edit_text(
-            "📤 Отправляю..."
-        )
-
-
-        await message.answer_video(
-            video=FSInputFile(
-                file_path
-            ),
-            caption="✅ Готово"
-        )
+            await message.answer(
+                "📤 Отправляю видео..."
+            )
 
 
-        try:
+            await message.answer_video(
+                FSInputFile(filename),
+                caption="✅ Готово"
+            )
 
-            await status.delete()
 
-        except TelegramBadRequest:
+            os.remove(filename)
 
-            pass
 
+        else:
+
+            await message.answer(
+                "❌ Видео не найдено"
+            )
 
 
     except Exception as e:
 
+        print("ERROR:", e)
 
-        logging.exception(e)
-
-
-        await status.edit_text(
-            "❌ Ошибка:\n"
-            +
-            str(e)[:500]
+        await message.answer(
+            "❌ Ошибка:\n\n" + str(e)[:1000]
         )
 
-
-
-    finally:
-
-
-        if file_path and os.path.exists(file_path):
-
-            os.remove(
-                file_path
-            )
-
-
-
-# =========================
-# MAIN
-# =========================
 
 async def main():
 
+    print("BOT ONLINE")
 
-    app = web.Application()
-
-
-    app.router.add_get(
-        "/",
-        home
-    )
-
-
-    runner = web.AppRunner(
-        app
-    )
-
-
-    await runner.setup()
-
-
-    port = int(
-        os.getenv(
-            "PORT",
-            10000
-        )
-    )
-
-
-    site = web.TCPSite(
-        runner,
-        "0.0.0.0",
-        port
-    )
-
-
-    await site.start()
-
-
-    logging.info(
-        "BOT STARTED"
-    )
-
-
-    await dp.start_polling(
-        bot
-    )
-
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-
-    asyncio.run(
-        main()
-    )
+    asyncio.run(main())
